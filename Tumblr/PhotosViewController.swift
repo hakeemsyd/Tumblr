@@ -51,7 +51,7 @@ class PhotosViewController: UIViewController,  UITableViewDataSource, UITableVie
     
     // data loading
     func fetchData(offset: Int, handler: @escaping (Data?, URLResponse?, Error?) -> Swift.Void) {
-        let fullUrl = "https://api.tumblr.com/v2/blog/humansofnewyork.tumblr.com/posts?limit=5&offset=\(offset)&api_key=Q6vHoaVm5L1u2ZAW1fqv3Jw48gFzYVg9P0vH0VHl3GVy6quoGV"
+        let fullUrl = "https://api.tumblr.com/v2/blog/humansofnewyork.tumblr.com/posts/photo?limit=5&offset=\(offset)&api_key=Q6vHoaVm5L1u2ZAW1fqv3Jw48gFzYVg9P0vH0VHl3GVy6quoGV"
         let url = URL(string: fullUrl)
         let request = URLRequest(url: url!)
         
@@ -68,9 +68,8 @@ class PhotosViewController: UIViewController,  UITableViewDataSource, UITableVie
             if let responseDictionary = try! JSONSerialization.jsonObject(
                 with: data, options:[]) as? NSDictionary {
                 let responseFieldDictionary = responseDictionary["response"] as! NSDictionary
-                let posts = responseFieldDictionary["posts"] as! [NSDictionary]
-                return posts;
-                //self.posts += posts;
+                let parsedPosts = responseFieldDictionary["posts"] as! [NSDictionary]
+                return parsedPosts;
             }
         }
         return [];
@@ -96,7 +95,7 @@ class PhotosViewController: UIViewController,  UITableViewDataSource, UITableVie
     func getImageUrl(postIndex: Int, photoIndex: Int) -> String{
         let post = self.posts[postIndex];
         if let photos = post.value(forKeyPath: "photos") as? [NSDictionary] {
-            let imageUrlString = photos[0].value(forKeyPath: "original_size.url") as? String
+            let imageUrlString = photos[photoIndex].value(forKeyPath: "original_size.url") as? String
             return imageUrlString!
         }
         
@@ -139,7 +138,6 @@ class PhotosViewController: UIViewController,  UITableViewDataSource, UITableVie
         
         // Add a UILabel for the date here
         // Use the section number to get the right URL
-        
         return headerView
     }
     
@@ -157,6 +155,20 @@ class PhotosViewController: UIViewController,  UITableViewDataSource, UITableVie
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if(posts.count - indexPath.section <= 4 && !self.isMoreDataLoading){
+            self.isMoreDataLoading = true;
+            loadingView.startAnimating()
+            
+            // ... Code to load more results ...
+            self.fetchData(offset: posts.count,handler: {(data, response, error) in
+                self.isMoreDataLoading = false;
+                self.loadingView.stopAnimating()
+                self.posts += self.parsePosts(data: data)
+                self.tableView.reloadData()
+            });
+            
+        }
+        
         let cell = tableView.dequeueReusableCell(withIdentifier: "PhotoTableCell") as! PhotoTableCell
         let strUrl = getImageUrl(postIndex: indexPath.section, photoIndex: indexPath.row)
         if let url = URL(string: strUrl){
@@ -165,21 +177,4 @@ class PhotosViewController: UIViewController,  UITableViewDataSource, UITableVie
         return cell
     }
     
-    func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            let scrollViewContentHeight = tableView.contentSize.height
-            let scrollOffsetThreshold = scrollViewContentHeight - tableView.bounds.size.height
-            
-            if(scrollView.contentOffset.y > scrollOffsetThreshold && tableView.isDragging) {
-                isMoreDataLoading = true
-                loadingView.startAnimating()
-                
-                // ... Code to load more results ...
-                self.fetchData(offset: posts.count,handler: {(data, response, error) in
-                    self.isMoreDataLoading = false;
-                    self.loadingView.stopAnimating()
-                    self.posts += self.parsePosts(data: data)
-                    self.tableView.reloadData()
-                });
-            }
-    }
 }
